@@ -1,8 +1,8 @@
-use qadataswap::SharedDataFrame;
+mod lib;
+use lib::{SharedDataFrame, SharedMemoryConfig, Result};
 use polars::prelude::*;
 use std::time::{Duration, Instant};
 use std::thread;
-use anyhow::Result;
 
 fn create_sample_dataframe(rows: usize) -> Result<DataFrame> {
     let ids: Vec<i64> = (0..rows as i64).collect();
@@ -24,8 +24,10 @@ fn writer_process() -> Result<()> {
     println!("=== Rust Basic Writer Example ===");
 
     let shared_name = "rust_basic_demo";
-    let arena = SharedDataFrame::new(shared_name, 100, 5)?;
-    arena.create_writer()?;
+    let config = SharedMemoryConfig::new(shared_name)
+        .with_size_mb(100)
+        .with_buffer_count(5);
+    let arena = SharedDataFrame::create_writer(config)?;
 
     println!("Writer created successfully");
 
@@ -62,8 +64,8 @@ fn reader_process() -> Result<()> {
     thread::sleep(Duration::from_millis(1000));
 
     let shared_name = "rust_basic_demo";
-    let arena = SharedDataFrame::new(shared_name, 0, 0)?;
-    arena.attach_reader()?;
+    let config = SharedMemoryConfig::new(shared_name);
+    let arena = SharedDataFrame::create_reader(config)?;
 
     println!("Reader attached successfully");
 
@@ -74,8 +76,8 @@ fn reader_process() -> Result<()> {
         println!("\nWaiting for batch {}...", batch_count + 1);
 
         let start = Instant::now();
-        match arena.read(Duration::from_secs(10)) {
-            Ok(df) => {
+        match arena.read(Some(10000)) { // 10 seconds in milliseconds
+            Ok(Some(df)) => {
                 let duration = start.elapsed();
 
                 println!("Batch {} received in {:?}", batch_count + 1, duration);
@@ -95,12 +97,12 @@ fn reader_process() -> Result<()> {
                 println!("{}", sample_df);
 
                 // Perform some analysis on numeric columns
-                if let Ok(stats) = df.select([
+                if let Ok(stats) = df.clone().lazy().select([
                     col("value1").mean().alias("value1_mean"),
                     col("value1").min().alias("value1_min"),
                     col("value1").max().alias("value1_max"),
                     col("value2").sum().alias("value2_sum"),
-                ]) {
+                ]).collect() {
                     println!("\nStatistics:");
                     println!("{}", stats);
                 }
@@ -111,6 +113,10 @@ fn reader_process() -> Result<()> {
                 println!("Read throughput: {:.2} MB/s", throughput_mb_s);
 
                 batch_count += 1;
+            }
+            Ok(None) => {
+                println!("No data available. Writer might have finished.");
+                break;
             }
             Err(e) => {
                 if e.to_string().contains("Timeout") {
@@ -136,7 +142,7 @@ fn main() -> Result<()> {
 
     if args.len() < 2 {
         println!("Usage:");
-        println!("  {} writer   - Run as writer");
+        println!("  {} writer   - Run as writer", args[0]);
         println!("  {} reader   - Run as reader", args[0]);
         println!();
         println!("Example:");

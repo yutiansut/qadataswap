@@ -1,9 +1,9 @@
-use qadataswap::SharedDataFrame;
+mod lib;
+use lib::{SharedDataFrame, SharedMemoryConfig, Result};
 use polars::prelude::*;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::thread;
 use rand::Rng;
-use anyhow::Result;
 
 fn create_market_data(rows: usize, symbols: &[&str]) -> Result<DataFrame> {
     let mut rng = rand::thread_rng();
@@ -63,8 +63,10 @@ fn main() -> Result<()> {
     println!("=========================");
 
     // Create shared memory arena
-    let arena = SharedDataFrame::new(&shared_name, 200, 5)?;
-    arena.create_writer()?;
+    let config = SharedMemoryConfig::new(&shared_name)
+        .with_size_mb(200)
+        .with_buffer_count(5);
+    let arena = SharedDataFrame::create_writer(config)?;
 
     println!("Writer created successfully");
 

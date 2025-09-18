@@ -1,10 +1,10 @@
-use qadataswap::SharedDataFrame;
+mod lib;
+use lib::{SharedDataFrame, SharedMemoryConfig, Result};
 use polars::prelude::*;
 use std::time::{Duration, Instant};
 use std::thread;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use anyhow::Result;
 
 fn create_test_dataframe(rows: usize) -> Result<DataFrame> {
     let ids: Vec<i64> = (0..rows as i64).collect();
@@ -32,8 +32,10 @@ fn benchmark_throughput() -> Result<()> {
 
         // Create arena
         let shared_name = format!("perf_test_{}", num_rows);
-        let arena = SharedDataFrame::new(&shared_name, 500, 3)?;
-        arena.create_writer()?;
+        let config = SharedMemoryConfig::new(&shared_name)
+            .with_size_mb(500)
+            .with_buffer_count(3);
+        let arena = SharedDataFrame::create_writer(config)?;
 
         // Create test data
         let df = create_test_dataframe(num_rows)?;
@@ -53,20 +55,23 @@ fn benchmark_throughput() -> Result<()> {
         );
 
         // Test reader performance
-        let reader_arena = SharedDataFrame::new(&shared_name, 0, 0)?;
-        reader_arena.attach_reader()?;
+        let reader_config = SharedMemoryConfig::new(&shared_name);
+        let reader_arena = SharedDataFrame::create_reader(reader_config)?;
 
         let start_time = Instant::now();
-        let read_result = reader_arena.read(Duration::from_secs(5));
+        let read_result = reader_arena.read(Some(5000)); // 5 seconds
         let read_duration = start_time.elapsed();
 
         match read_result {
-            Ok(_) => {
+            Ok(Some(_)) => {
                 let read_throughput = (estimated_size as f64 / 1024.0 / 1024.0) / read_duration.as_secs_f64();
                 println!(
                     "Read:  {:?}, {:.2} MB/s",
                     read_duration, read_throughput
                 );
+            }
+            Ok(None) => {
+                println!("No data available for reading");
             }
             Err(e) => {
                 eprintln!("Read failed: {}", e);
@@ -80,11 +85,13 @@ fn benchmark_throughput() -> Result<()> {
 fn benchmark_latency() -> Result<()> {
     println!("\n=== Latency Benchmark ===");
 
-    let arena = SharedDataFrame::new("latency_test", 100, 10)?;
-    arena.create_writer()?;
+    let config = SharedMemoryConfig::new("latency_test")
+        .with_size_mb(100)
+        .with_buffer_count(10);
+    let arena = SharedDataFrame::create_writer(config)?;
 
     // Small message for latency test
-    let df = df! {
+    let _df = df! {
         "timestamp" => vec![chrono::Utc::now().timestamp_micros()],
     }?;
 
@@ -147,8 +154,10 @@ fn benchmark_concurrent() -> Result<()> {
         let writer_name = format!("{}_{}", shared_name, w);
 
         let handle = thread::spawn(move || -> Result<()> {
-            let arena = SharedDataFrame::new(&writer_name, 200, 5)?;
-            arena.create_writer()?;
+            let config = SharedMemoryConfig::new(&writer_name)
+                .with_size_mb(200)
+                .with_buffer_count(5);
+            let arena = SharedDataFrame::create_writer(config)?;
 
             for m in 0..messages_per_writer {
                 let df = df! {
@@ -171,7 +180,7 @@ fn benchmark_concurrent() -> Result<()> {
     }
 
     // Start readers
-    for r in 0..num_readers {
+    for _r in 0..num_readers {
         let total_reads_clone = Arc::clone(&total_reads);
 
         let handle = thread::spawn(move || -> Result<()> {
@@ -179,15 +188,14 @@ fn benchmark_concurrent() -> Result<()> {
 
             for w in 0..num_writers {
                 let writer_name = format!("{}_{}", shared_name, w);
-                let arena = SharedDataFrame::new(&writer_name, 0, 0)?;
+                let config = SharedMemoryConfig::new(&writer_name);
+                let arena = SharedDataFrame::create_reader(config)?;
 
-                if arena.attach_reader().is_ok() {
-                    for _m in 0..messages_per_writer {
-                        if arena.read(Duration::from_secs(1)).is_ok() {
-                            total_reads_clone.fetch_add(1, Ordering::Relaxed);
-                        } else {
-                            break; // Timeout or error
-                        }
+                for _m in 0..messages_per_writer {
+                    if let Ok(Some(_)) = arena.read(Some(1000)) { // 1 second
+                        total_reads_clone.fetch_add(1, Ordering::Relaxed);
+                    } else {
+                        break; // Timeout or error
                     }
                 }
             }

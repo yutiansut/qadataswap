@@ -1,8 +1,8 @@
-use qadataswap::SharedDataFrame;
+mod lib;
+use lib::{SharedDataFrame, SharedMemoryConfig, Result};
 use polars::prelude::*;
 use std::time::{Duration, Instant};
 use std::thread;
-use anyhow::Result;
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -21,8 +21,8 @@ fn main() -> Result<()> {
     thread::sleep(Duration::from_millis(1000));
 
     // Create shared memory arena
-    let arena = SharedDataFrame::new(&shared_name, 0, 0)?;
-    arena.attach_reader()?;
+    let config = SharedMemoryConfig::new(&shared_name);
+    let arena = SharedDataFrame::create_reader(config)?;
 
     println!("Reader attached successfully");
 
@@ -35,8 +35,8 @@ fn main() -> Result<()> {
         // Read from shared memory with timeout
         let start = Instant::now();
 
-        match arena.read(Duration::from_secs(15)) {
-            Ok(df) => {
+        match arena.read(Some(15000)) { // 15 seconds in milliseconds
+            Ok(Some(df)) => {
                 let duration = start.elapsed();
 
                 println!(
@@ -61,13 +61,13 @@ fn main() -> Result<()> {
 
                 // Perform analysis on financial data
                 if df.get_column_names().contains(&"price") {
-                    let analysis = df.select([
+                    let analysis = df.clone().lazy().select([
                         col("price").sum().alias("total_volume_value"),
                         col("price").mean().alias("avg_price"),
                         col("price").min().alias("min_price"),
                         col("price").max().alias("max_price"),
                         col("volume").sum().alias("total_volume"),
-                    ]);
+                    ]).collect();
 
                     if let Ok(stats) = analysis {
                         println!("\nPrice Analysis:");
@@ -77,7 +77,7 @@ fn main() -> Result<()> {
 
                 // Group by symbol if available
                 if df.get_column_names().contains(&"symbol") {
-                    let symbol_stats = df
+                    let symbol_stats = df.clone()
                         .lazy()
                         .group_by([col("symbol")])
                         .agg([
@@ -99,6 +99,10 @@ fn main() -> Result<()> {
                 println!("Read throughput: {:.2} MB/s", throughput_mb_s);
 
                 batch_count += 1;
+            }
+            Ok(None) => {
+                println!("No data available. Writer might have finished.");
+                break;
             }
             Err(e) => {
                 if e.to_string().contains("Timeout") {

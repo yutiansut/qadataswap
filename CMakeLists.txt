@@ -33,6 +33,7 @@ add_compile_options(-Wall -Wextra -O3 -fPIC)
 # Core library
 add_library(qadataswap_core SHARED
     src/cpp/src/shared_memory_arena.cpp
+    src/cpp/src/ffi_interface.cpp
 )
 
 target_link_libraries(qadataswap_core
