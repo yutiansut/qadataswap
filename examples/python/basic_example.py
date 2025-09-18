@@ -25,12 +25,6 @@ def writer_process(name: str, num_rows: int = 1000000):
         "price": pl.arange(0, num_rows, eager=True).cast(pl.Float64) * 1.5 + 100.0,
         "volume": pl.arange(0, num_rows, eager=True) * 10,
         "symbol": ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA"] * (num_rows // 5),
-        "timestamp": pl.datetime_range(
-            start=pl.datetime(2024, 1, 1),
-            end=pl.datetime(2024, 12, 31),
-            interval="1m",
-            eager=True
-        ).head(num_rows)
     })
 
     print(f"Writer: Generated DataFrame with shape {df.shape}")

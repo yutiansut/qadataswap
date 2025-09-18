@@ -5,8 +5,8 @@
 
 #include "qadataswap_core.h"
 
-//#include <arrow/python/pyarrow.h>
-//#include <arrow/api.h>
+#include <arrow/python/pyarrow.h>
+#include <arrow/api.h>
 
 namespace py = pybind11;
 

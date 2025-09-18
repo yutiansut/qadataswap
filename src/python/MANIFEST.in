@@ -1,0 +1,25 @@
+# Include the README and license
+include README.md
+include ../../LICENSE
+
+# Include C++ source code
+recursive-include ../cpp/include *.h
+recursive-include ../cpp/src *.cpp
+
+# Include Python source
+recursive-include qadataswap *.py
+
+# Include configuration files
+include pyproject.toml
+include setup.py
+
+# Exclude build artifacts
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.so
+global-exclude *~
+global-exclude .git*
+global-exclude __pycache__
+global-exclude *.egg-info
+prune build
+prune dist

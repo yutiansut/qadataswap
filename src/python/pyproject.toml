@@ -1,0 +1,119 @@
+[build-system]
+requires = [
+    "setuptools>=45",
+    "wheel",
+    "pybind11>=2.10.0",
+    "setuptools-scm",
+    "pyarrow>=10.0.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qadataswap"
+description = "High-performance cross-language zero-copy data transfer framework"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "QADataSwap Team", email = "support@qadataswap.org"},
+]
+maintainers = [
+    {name = "QADataSwap Team", email = "support@qadataswap.org"},
+]
+keywords = [
+    "shared-memory",
+    "zero-copy",
+    "data-transfer",
+    "arrow",
+    "polars",
+    "rust",
+    "cpp",
+    "ipc",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware :: Symmetric Multi-processing",
+]
+dependencies = [
+    "pyarrow>=10.0.0",
+    "polars>=0.18.0",
+    "numpy>=1.20.0",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-benchmark",
+    "black",
+    "ruff",
+    "mypy",
+    "pre-commit",
+]
+test = [
+    "pytest>=6.0",
+    "pytest-benchmark",
+    "hypothesis",
+]
+docs = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme",
+    "myst-parser",
+]
+
+[project.urls]
+Homepage = "https://github.com/quantaxis/qadataswap"
+Documentation = "https://qadataswap.readthedocs.io/"
+Repository = "https://github.com/quantaxis/qadataswap.git"
+"Bug Tracker" = "https://github.com/quantaxis/qadataswap/issues"
+Changelog = "https://github.com/quantaxis/qadataswap/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+packages = ["qadataswap"]
+
+[tool.setuptools.dynamic]
+version = {attr = "qadataswap.__version__"}
+
+[tool.setuptools-scm]
+write_to = "qadataswap/_version.py"
+
+# Development tools configuration
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.ruff]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]  # Line too long
+line-length = 88
+target-version = "py38"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+]
