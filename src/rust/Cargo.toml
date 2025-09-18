@@ -1,0 +1,53 @@
+[package]
+name = "qadataswap"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "High-performance cross-language zero-copy data transfer with Polars support"
+
+[dependencies]
+polars.workspace = true
+arrow.workspace = true
+arrow-ipc.workspace = true
+arrow-array.workspace = true
+arrow-buffer.workspace = true
+arrow-data.workspace = true
+arrow-schema.workspace = true
+
+libc.workspace = true
+memmap2.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+bytes.workspace = true
+tokio = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+
+# For FFI with C++ core
+cxx.workspace = true
+bindgen.workspace = true
+
+[build-dependencies]
+cxx-build = "1.0"
+cc = "1.0"
+
+[features]
+default = ["polars-support"]
+polars-support = []
+async = ["tokio", "futures"]
+streaming = []
+
+[dev-dependencies]
+criterion = "0.5"
+tempfile = "3.0"
+rand = "0.8"
+
+[[bench]]
+name = "benchmark"
+harness = false
+
+[lib]
+name = "qadataswap"
+crate-type = ["cdylib", "rlib"]

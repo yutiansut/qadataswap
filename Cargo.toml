@@ -1,0 +1,46 @@
+[workspace]
+members = ["src/rust"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/your-org/qadataswap"
+keywords = ["polars", "arrow", "shared-memory", "zero-copy", "ipc"]
+categories = ["science", "data-structures", "memory-management"]
+
+[workspace.dependencies]
+polars = { version = "0.33", features = ["lazy", "streaming", "ipc"] }
+arrow = { version = "51.0", features = ["ipc", "chrono-tz"] }
+arrow-ipc = "51.0"
+arrow-array = "51.0"
+arrow-buffer = "51.0"
+arrow-data = "51.0"
+arrow-schema = "51.0"
+
+libc = "0.2"
+memmap2 = "0.7"
+thiserror = "1.0"
+anyhow = "1.0"
+bytes = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+
+# For FFI with C++ core
+cxx = "1.0"
+bindgen = "0.68"
+
+# Development dependencies
+criterion = "0.5"
+tempfile = "3.0"
+rand = "0.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+debug = true
