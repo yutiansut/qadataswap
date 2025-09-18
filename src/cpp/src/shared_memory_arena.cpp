@@ -181,6 +181,15 @@ void SharedMemoryArena::InitializeHeader() {
     }
 }
 
+arrow::Status SharedMemoryArena::WriteTable(const std::shared_ptr<arrow::Table>& table) {
+    // Convert table to record batch
+    auto batches_result = table->CombineChunksToBatch();
+    if (!batches_result.ok()) {
+        return batches_result.status();
+    }
+    return WriteRecordBatch(batches_result.ValueOrDie());
+}
+
 arrow::Status SharedMemoryArena::WriteRecordBatch(
     const std::shared_ptr<arrow::RecordBatch>& batch) {
 
@@ -278,6 +287,15 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> SharedMemoryArena::ReadRecord
     return result;
 }
 
+arrow::Result<std::shared_ptr<arrow::Table>> SharedMemoryArena::ReadTable(int timeout_ms) {
+    auto batch_result = ReadRecordBatch(timeout_ms);
+    if (!batch_result.ok()) {
+        return batch_result.status();
+    }
+    auto batch = batch_result.ValueOrDie();
+    return arrow::Table::FromRecordBatches({batch});
+}
+
 size_t SharedMemoryArena::GetNextWriteBuffer() {
     return header_->write_sequence.load() % buffer_count_;
 }
@@ -317,6 +335,52 @@ arrow::Result<std::shared_ptr<arrow::RecordBatch>> SharedMemoryArena::Deserializ
     return batch;
 }
 
+arrow::Result<std::shared_ptr<arrow::RecordBatch>> SharedMemoryArena::ReadRecordBatchNoWait() {
+    return ReadRecordBatch(0);  // 0 timeout for no wait
+}
+
+arrow::Status SharedMemoryArena::WaitForData(int timeout_ms) {
+    if (timeout_ms >= 0) {
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += timeout_ms / 1000;
+        ts.tv_nsec += (timeout_ms % 1000) * 1000000;
+        if (ts.tv_nsec >= 1000000000) {
+            ts.tv_sec += 1;
+            ts.tv_nsec -= 1000000000;
+        }
+
+        if (sem_timedwait(read_sem_, &ts) != 0) {
+            if (errno == ETIMEDOUT) {
+                return arrow::Status::IOError("Timeout waiting for data");
+            }
+            return arrow::Status::IOError("Failed to wait for read semaphore");
+        }
+    } else {
+        if (sem_wait(read_sem_) != 0) {
+            return arrow::Status::IOError("Failed to wait for read semaphore");
+        }
+    }
+
+    // Put back the semaphore since we were only checking
+    sem_post(read_sem_);
+    return arrow::Status::OK();
+}
+
+void SharedMemoryArena::NotifyDataReady() {
+    sem_post(read_sem_);
+}
+
+std::unique_ptr<SharedMemoryArena::Writer> SharedMemoryArena::GetWriter() {
+    if (!is_writer_) return nullptr;
+    return std::make_unique<Writer>(this);
+}
+
+std::unique_ptr<SharedMemoryArena::Reader> SharedMemoryArena::GetReader() {
+    if (is_writer_) return nullptr;
+    return std::make_unique<Reader>(this);
+}
+
 void SharedMemoryArena::Close() {
     if (mapped_memory_) {
         if (is_writer_) {
@@ -354,6 +418,96 @@ void SharedMemoryArena::Close() {
     }
 
     is_attached_ = false;
+}
+
+// Writer implementation
+SharedMemoryArena::Writer::Writer(SharedMemoryArena* arena)
+    : arena_(arena), finished_(false) {
+}
+
+SharedMemoryArena::Writer::~Writer() {
+    if (!finished_) {
+        (void)Finish(); // Ignore return value in destructor
+    }
+}
+
+arrow::Status SharedMemoryArena::Writer::WriteChunk(const std::shared_ptr<arrow::RecordBatch>& batch) {
+    if (finished_) {
+        return arrow::Status::Invalid("Writer has been finished");
+    }
+    return arena_->WriteRecordBatch(batch);
+}
+
+arrow::Status SharedMemoryArena::Writer::WriteChunk(const std::shared_ptr<arrow::Table>& table) {
+    if (finished_) {
+        return arrow::Status::Invalid("Writer has been finished");
+    }
+    return arena_->WriteTable(table);
+}
+
+arrow::Status SharedMemoryArena::Writer::Flush() {
+    // For shared memory, data is immediately available
+    return arrow::Status::OK();
+}
+
+arrow::Status SharedMemoryArena::Writer::Finish() {
+    finished_ = true;
+    return arrow::Status::OK();
+}
+
+// Reader implementation
+SharedMemoryArena::Reader::Reader(SharedMemoryArena* arena)
+    : arena_(arena) {
+}
+
+SharedMemoryArena::Reader::~Reader() {
+}
+
+arrow::Result<std::shared_ptr<arrow::RecordBatch>> SharedMemoryArena::Reader::ReadChunk(int timeout_ms) {
+    return arena_->ReadRecordBatch(timeout_ms);
+}
+
+arrow::Result<std::shared_ptr<arrow::Table>> SharedMemoryArena::Reader::ReadTable(int timeout_ms) {
+    return arena_->ReadTable(timeout_ms);
+}
+
+// Iterator implementation
+SharedMemoryArena::Reader::Iterator::Iterator(Reader* reader, bool end)
+    : reader_(reader), is_end_(end) {
+    if (!is_end_) {
+        LoadNext();
+    }
+}
+
+std::shared_ptr<arrow::RecordBatch> SharedMemoryArena::Reader::Iterator::operator*() {
+    return current_batch_;
+}
+
+SharedMemoryArena::Reader::Iterator& SharedMemoryArena::Reader::Iterator::operator++() {
+    LoadNext();
+    return *this;
+}
+
+bool SharedMemoryArena::Reader::Iterator::operator!=(const Iterator& other) const {
+    return is_end_ != other.is_end_;
+}
+
+void SharedMemoryArena::Reader::Iterator::LoadNext() {
+    auto result = reader_->ReadChunk(100); // 100ms timeout
+    if (!result.ok() || !result.ValueOrDie()) {
+        is_end_ = true;
+        current_batch_ = nullptr;
+    } else {
+        current_batch_ = result.ValueOrDie();
+    }
+}
+
+SharedMemoryArena::Reader::Iterator SharedMemoryArena::Reader::begin() {
+    return Iterator(this, false);
+}
+
+SharedMemoryArena::Reader::Iterator SharedMemoryArena::Reader::end() {
+    return Iterator(this, true);
 }
 
 std::unique_ptr<SharedMemoryArena> CreateSharedDataFrame(

@@ -22,6 +22,7 @@ ext_modules = [
         ],
         library_dirs=arrow_library_dirs,
         libraries=arrow_libraries + ["rt", "pthread"],
+        runtime_library_dirs=arrow_library_dirs,
         cxx_std=17,
         define_macros=[("VERSION_INFO", '"dev"')],
         language="c++",

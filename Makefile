@@ -100,6 +100,10 @@ $(SRC_DIR)/python/build/lib*/qadataswap*.so: $(SRC_DIR)/python/*.cpp $(SRC_DIR)/
 	@echo "Building Python bindings..."
 	cd $(SRC_DIR)/python && python setup.py build_ext --inplace
 
+python-simple:
+	@echo "Building simplified Python bindings..."
+	cd $(SRC_DIR)/python && python setup_simple.py build_ext --inplace
+
 install-python: python
 	@echo "Installing Python package..."
 	cd $(SRC_DIR)/python && pip install -e .

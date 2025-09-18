@@ -5,8 +5,8 @@
 
 #include "qadataswap_core.h"
 
-#include <arrow/python/pyarrow.h>
-#include <arrow/api.h>
+//#include <arrow/python/pyarrow.h>
+//#include <arrow/api.h>
 
 namespace py = pybind11;
 
@@ -86,7 +86,7 @@ public:
 
         // Convert PyArrow Table to Polars DataFrame
         py::module polars = py::module::import("polars");
-        py::object polars_df = polars.attr("from_arrow")(reinterpret_steal<py::object>(py_table.ValueOrDie()));
+        py::object polars_df = polars.attr("from_arrow")(py::reinterpret_steal<py::object>(py_table.ValueOrDie()));
 
         return polars_df;
     }
@@ -105,7 +105,7 @@ public:
             throw std::runtime_error("Failed to wrap table");
         }
 
-        return reinterpret_steal<py::object>(py_table.ValueOrDie());
+        return py::reinterpret_steal<py::object>(py_table.ValueOrDie());
     }
 
     bool wait_for_data(int timeout_ms = -1) {
@@ -165,135 +165,7 @@ private:
     }
 };
 
-// Streaming interface for large datasets
-class SharedDataStream {
-public:
-    SharedDataStream(const std::string& name, size_t size_mb = 1024, size_t buffer_count = 8)
-        : arena_(std::make_unique<SharedMemoryArena>(name, size_mb * 1024 * 1024, buffer_count)) {}
-
-    static std::shared_ptr<SharedDataStream> create_writer(const std::string& name,
-                                                          size_t size_mb = 1024,
-                                                          size_t buffer_count = 8) {
-        auto stream = std::make_shared<SharedDataStream>(name, size_mb, buffer_count);
-        if (!stream->arena_->CreateWriter()) {
-            throw std::runtime_error("Failed to create stream writer");
-        }
-        stream->writer_ = stream->arena_->GetWriter();
-        return stream;
-    }
-
-    static std::shared_ptr<SharedDataStream> create_reader(const std::string& name) {
-        auto stream = std::make_shared<SharedDataStream>(name);
-        if (!stream->arena_->AttachReader()) {
-            throw std::runtime_error("Failed to attach stream reader");
-        }
-        stream->reader_ = stream->arena_->GetReader();
-        return stream;
-    }
-
-    void write_chunk(py::object polars_df) {
-        py::object arrow_table = polars_df.attr("to_arrow")();
-        auto cpp_table = arrow::py::unwrap_table(arrow_table.ptr());
-        if (!cpp_table.ok()) {
-            throw std::runtime_error("Failed to unwrap Arrow table");
-        }
-
-        auto status = writer_->WriteChunk(cpp_table.ValueOrDie());
-        if (!status.ok()) {
-            throw std::runtime_error("Failed to write chunk: " + status.ToString());
-        }
-    }
-
-    py::object read_chunk(int timeout_ms = -1) {
-        auto result = reader_->ReadChunk(timeout_ms);
-        if (!result.ok()) {
-            if (result.status().IsIOError() && result.status().message().find("Timeout") != std::string::npos) {
-                return py::none();
-            }
-            throw std::runtime_error("Failed to read chunk: " + result.status().ToString());
-        }
-
-        auto batch = result.ValueOrDie();
-        if (!batch) {
-            return py::none(); // End of stream
-        }
-
-        auto table = arrow::Table::FromRecordBatches({batch});
-        if (!table.ok()) {
-            throw std::runtime_error("Failed to create table from batch");
-        }
-
-        auto py_table = arrow::py::wrap_table(table.ValueOrDie());
-        if (!py_table.ok()) {
-            throw std::runtime_error("Failed to wrap table");
-        }
-
-        py::module polars = py::module::import("polars");
-        py::object polars_df = polars.attr("from_arrow")(reinterpret_steal<py::object>(py_table.ValueOrDie()));
-
-        return polars_df;
-    }
-
-    py::object iter_chunks() {
-        return py::cast(PolarsChunkIterator(reader_.get()));
-    }
-
-    void flush() {
-        if (writer_) {
-            auto status = writer_->Flush();
-            if (!status.ok()) {
-                throw std::runtime_error("Failed to flush: " + status.ToString());
-            }
-        }
-    }
-
-    void finish() {
-        if (writer_) {
-            auto status = writer_->Finish();
-            if (!status.ok()) {
-                throw std::runtime_error("Failed to finish: " + status.ToString());
-            }
-        }
-    }
-
-private:
-    std::unique_ptr<SharedMemoryArena> arena_;
-    std::unique_ptr<SharedMemoryArena::Writer> writer_;
-    std::unique_ptr<SharedMemoryArena::Reader> reader_;
-
-    class PolarsChunkIterator {
-    public:
-        PolarsChunkIterator(SharedMemoryArena::Reader* reader) : reader_(reader) {}
-
-        py::object __iter__() {
-            return py::cast(*this);
-        }
-
-        py::object __next__() {
-            auto result = reader_->ReadChunk();
-            if (!result.ok() || !result.ValueOrDie()) {
-                throw py::stop_iteration();
-            }
-
-            auto batch = result.ValueOrDie();
-            auto table = arrow::Table::FromRecordBatches({batch});
-            if (!table.ok()) {
-                throw std::runtime_error("Failed to create table from batch");
-            }
-
-            auto py_table = arrow::py::wrap_table(table.ValueOrDie());
-            if (!py_table.ok()) {
-                throw std::runtime_error("Failed to wrap table");
-            }
-
-            py::module polars = py::module::import("polars");
-            return polars.attr("from_arrow")(reinterpret_steal<py::object>(py_table.ValueOrDie()));
-        }
-
-    private:
-        SharedMemoryArena::Reader* reader_;
-    };
-};
+// Note: SharedDataStream removed for simplification - use SharedDataFrame for now
 
 } // namespace qadataswap
 
@@ -306,9 +178,11 @@ PYBIND11_MODULE(qadataswap, m) {
     py::class_<qadataswap::SharedDataFrame, std::shared_ptr<qadataswap::SharedDataFrame>>(m, "SharedDataFrame")
         .def(py::init<const std::string&, size_t, size_t>(),
              py::arg("name"), py::arg("size_mb") = 100, py::arg("buffer_count") = 3)
-        .def_static("create_writer", &qadataswap::SharedDataFrame::create_writer,
+        .def_static("create_writer",
+                   static_cast<std::shared_ptr<qadataswap::SharedDataFrame>(*)(const std::string&, size_t, size_t)>(&qadataswap::SharedDataFrame::create_writer),
                    py::arg("name"), py::arg("size_mb") = 100, py::arg("buffer_count") = 3)
-        .def_static("create_reader", &qadataswap::SharedDataFrame::create_reader,
+        .def_static("create_reader",
+                   static_cast<std::shared_ptr<qadataswap::SharedDataFrame>(*)(const std::string&)>(&qadataswap::SharedDataFrame::create_reader),
                    py::arg("name"))
         .def("write", &qadataswap::SharedDataFrame::write_polars_dataframe,
              "Write a Polars DataFrame with zero-copy")
@@ -323,18 +197,4 @@ PYBIND11_MODULE(qadataswap, m) {
         .def("notify_data_ready", &qadataswap::SharedDataFrame::notify_data_ready)
         .def("get_stats", &qadataswap::SharedDataFrame::get_stats)
         .def("close", &qadataswap::SharedDataFrame::close);
-
-    py::class_<qadataswap::SharedDataStream, std::shared_ptr<qadataswap::SharedDataStream>>(m, "SharedDataStream")
-        .def_static("create_writer", &qadataswap::SharedDataStream::create_writer,
-                   py::arg("name"), py::arg("size_mb") = 1024, py::arg("buffer_count") = 8)
-        .def_static("create_reader", &qadataswap::SharedDataStream::create_reader,
-                   py::arg("name"))
-        .def("write_chunk", &qadataswap::SharedDataStream::write_chunk,
-             "Write a chunk (Polars DataFrame)")
-        .def("read_chunk", &qadataswap::SharedDataStream::read_chunk,
-             py::arg("timeout_ms") = -1, "Read a chunk as Polars DataFrame")
-        .def("iter_chunks", &qadataswap::SharedDataStream::iter_chunks,
-             "Iterate over chunks as Polars DataFrames")
-        .def("flush", &qadataswap::SharedDataStream::flush)
-        .def("finish", &qadataswap::SharedDataStream::finish);
 }
