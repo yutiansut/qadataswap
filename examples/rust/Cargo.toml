@@ -1,0 +1,28 @@
+[package]
+name = "qadataswap-examples"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "basic_example"
+path = "src/basic_example.rs"
+
+[[bin]]
+name = "rust_writer"
+path = "src/cross_language_writer.rs"
+
+[[bin]]
+name = "rust_reader"
+path = "src/cross_language_reader.rs"
+
+[[bin]]
+name = "performance_test"
+path = "src/performance_test.rs"
+
+[dependencies]
+qadataswap = { path = "../../src/rust" }
+polars = { version = "0.35", features = ["lazy", "ipc"] }
+tokio = { version = "1.0", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+rand = "0.8"
