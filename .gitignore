@@ -1,0 +1,422 @@
+# QADataSwap - .gitignore
+# High-performance cross-language data transfer framework
+
+###################
+# Build Directories
+###################
+build/
+dist/
+install/
+target/
+*.egg-info/
+.eggs/
+
+###################
+# C++ Build Artifacts
+###################
+# Object files
+*.o
+*.obj
+*.lo
+*.slo
+
+# Shared libraries
+*.so
+*.so.*
+*.dylib
+*.dll
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+*.cmake
+
+# Make
+Makefile
+.make/
+
+# Autotools
+.deps/
+.dirstamp
+autom4te.cache/
+config.guess
+config.sub
+configure
+depcomp
+install-sh
+ltmain.sh
+missing
+compile
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+###################
+# Rust Build Artifacts
+###################
+# Cargo
+Cargo.lock
+target/
+**/*.rs.bk
+*.orig
+
+# rustfmt
+*.fmt
+
+###################
+# Python Build Artifacts
+###################
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+###################
+# IDE and Editor Files
+###################
+# VSCode
+.vscode/
+*.code-workspace
+
+# IntelliJ / CLion / PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Kate
+.kateconfig
+
+###################
+# OS Generated Files
+###################
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+###################
+# Project Specific
+###################
+# QADataSwap specific
+*.qads
+/dev/shm/qads_*
+
+# Shared memory files
+/tmp/qads_*
+/var/tmp/qads_*
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Performance test results
+benchmark_results.*
+*.perf
+perf.data*
+
+# Documentation build
+docs/build/
+docs/_build/
+site/
+
+# Local configuration
+local.toml
+local.yaml
+local.json
+.env.local
+
+# IDE settings
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# Arrow/Parquet files (test data)
+*.arrow
+*.parquet
+*.feather
+
+# Test output
+test_output/
+test_results/
+
+###################
+# Dependencies
+###################
+# Node modules (if any JS tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Conda
+*.conda
+environment.yml.lock
+
+###################
+# Security
+###################
+# Private keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Environment variables
+.env.production
+.env.development
+.env.test
+
+# Secrets
+secrets/
+*.secret
+
+###################
+# Archives
+###################
+*.zip
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.rar
+*.7z
+
+###################
+# Misc
+###################
+# Core dumps
+core
+core.*
+
+# Memory dumps
+*.stackdump
+
+# Temporary editor files
+*.tmp
+*~
+
+# Package files
+*.deb
+*.rpm
+*.dmg
+*.pkg

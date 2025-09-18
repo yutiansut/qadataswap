@@ -28,7 +28,7 @@ include_directories(${ARROW_INCLUDE_DIRS})
 
 # Compiler flags
 add_compile_options(-Wall -Wextra -O3 -fPIC)
-add_compile_definitions(${ARROW_CFLAGS_OTHER})
+# Note: Skip problematic Arrow compile definitions that may contain invalid macro names
 
 # Core library
 add_library(qadataswap_core SHARED
@@ -47,12 +47,12 @@ target_include_directories(qadataswap_core PUBLIC
 )
 
 # Examples
-if(BUILD_EXAMPLES)
+if(BUILD_EXAMPLES AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/examples/cpp/CMakeLists.txt)
     add_subdirectory(examples/cpp)
 endif()
 
 # Tests
-if(BUILD_TESTS)
+if(BUILD_TESTS AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/CMakeLists.txt)
     enable_testing()
     add_subdirectory(tests/unit)
 endif()

@@ -151,8 +151,13 @@ bool SharedMemoryArena::AttachSharedMemory() {
 }
 
 void SharedMemoryArena::InitializeHeader() {
-    memset(header_, 0, sizeof(SharedMemoryHeader) +
-           sizeof(SharedMemoryHeader::BufferState) * buffer_count_);
+    // Use placement new for proper initialization
+    new (header_) SharedMemoryHeader();
+
+    // Initialize the flexible array member
+    for (size_t i = 0; i < buffer_count_; ++i) {
+        new (&header_->buffer_states[i]) SharedMemoryHeader::BufferState();
+    }
 
     header_->magic = MAGIC_NUMBER;
     header_->version = VERSION;

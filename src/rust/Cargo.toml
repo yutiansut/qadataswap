@@ -10,12 +10,6 @@ description = "High-performance cross-language zero-copy data transfer with Pola
 
 [dependencies]
 polars.workspace = true
-arrow.workspace = true
-arrow-ipc.workspace = true
-arrow-array.workspace = true
-arrow-buffer.workspace = true
-arrow-data.workspace = true
-arrow-schema.workspace = true
 
 libc.workspace = true
 memmap2.workspace = true
@@ -43,10 +37,6 @@ streaming = []
 criterion = "0.5"
 tempfile = "3.0"
 rand = "0.8"
-
-[[bench]]
-name = "benchmark"
-harness = false
 
 [lib]
 name = "qadataswap"

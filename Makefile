@@ -12,7 +12,10 @@ INSTALL_DIR = install
 DOCS_DIR = docs
 
 # Default target
-all: cpp python rust
+all: cpp rust
+
+# Include Python only if explicitly requested
+all-with-python: cpp python rust
 
 # Help target
 help:

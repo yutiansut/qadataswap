@@ -3,7 +3,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/chrono.h>
 
-#include "../../core/include/qadataswap_core.h"
+#include "qadataswap_core.h"
 
 #include <arrow/python/pyarrow.h>
 #include <arrow/api.h>
