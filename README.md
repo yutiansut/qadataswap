@@ -50,29 +50,53 @@
 
 ```bash
 # Ubuntu/Debian
-sudo apt install libarrow-dev libparquet-dev
+sudo apt install libarrow-dev cmake g++ python3-dev
 
-# 或者使用conda
-conda install -c conda-forge pyarrow polars arrow-cpp
+# Python 依赖
+pip install polars pyarrow pybind11
+
+# Rust (如需要)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs/ | sh
 ```
 
-### 构建
+### 统一构建
 
 ```bash
-# 构建所有组件
-make all
+# 构建所有组件 (推荐)
+./scripts/build_all.sh
 
-# 仅构建核心C++库
-make core
+# 清理后重新构建
+./scripts/build_all.sh --clean
 
-# 构建Python绑定 (支持Polars)
-make python
+# 仅构建特定语言
+./scripts/build_all.sh --cpp-only
+./scripts/build_all.sh --python-only
+./scripts/build_all.sh --rust-only
 
-# 构建Rust库 (支持Polars)
-make rust
+# 构建 Python wheel 包
+./scripts/build_all.sh --wheel
 
-# 运行性能测试
-make benchmark
+# 查看帮助
+./scripts/build_all.sh --help
+```
+
+### 运行测试
+
+```bash
+# 运行所有测试
+./scripts/test_all.sh
+
+# 运行特定测试
+./scripts/test_all.sh --python-only
+./scripts/test_all.sh --cpp-only
+./scripts/test_all.sh --rust-only
+./scripts/test_all.sh --cross-lang-only
+
+# 包含性能测试
+./scripts/test_all.sh --with-performance
+
+# 查看测试帮助
+./scripts/test_all.sh --help
 ```
 
 ## 📚 快速开始
@@ -81,51 +105,78 @@ make benchmark
 
 ```python
 import polars as pl
-from qadataswap import SharedDataFrame
+import sys
+sys.path.append('src/python')
+import qadataswap
 
 # 写入端
-writer = SharedDataFrame.create_writer("mydata", size_mb=100)
-df = pl.DataFrame({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0]})
-writer.write(df)  # 零拷贝写入
+writer = qadataswap.create_writer("test_data", 50)
+df = pl.DataFrame({
+    'timestamp': [1640995200 + i for i in range(1000)],
+    'symbol': ['AAPL', 'MSFT', 'GOOGL'][i % 3] for i in range(1000),
+    'price': [100.0 + i * 0.1 for i in range(1000)],
+    'volume': [1000 + i for i in range(1000)]
+})
+writer.write_arrow(df.to_arrow())  # 写入Arrow格式
 
 # 读取端
-reader = SharedDataFrame.create_reader("mydata")
-df = reader.read()  # 零拷贝读取，返回Polars DataFrame
-print(df)
+reader = qadataswap.create_reader("test_data")
+arrow_table = reader.read_arrow(5000)  # 5秒超时
+if arrow_table:
+    df = pl.from_arrow(arrow_table)  # 转换为Polars DataFrame
+    print(df)
 ```
 
 ### Rust (使用Polars)
 
 ```rust
+use qadataswap::{create_writer, create_reader};
 use polars::prelude::*;
-use qadataswap::SharedDataFrame;
 
-// 写入端
-let mut writer = SharedDataFrame::create_writer("mydata", 100 * 1024 * 1024)?;
-let df = df! {
-    "a" => [1, 2, 3],
-    "b" => [4.0, 5.0, 6.0],
-}?;
-writer.write(&df)?;
+// 写入端 - 运行示例
+// cargo run --bin rust_writer test_data
 
-// 读取端
-let reader = SharedDataFrame::create_reader("mydata")?;
-let df = reader.read()?;  // 零拷贝读取
-println!("{}", df);
+// 读取端 - 运行示例
+// cargo run --bin rust_reader test_data
+
+// 或查看 examples/rust/src/bin/ 中的完整示例
 ```
 
 ### C++ (原生Arrow)
 
 ```cpp
-#include <qadataswap/shared_dataframe.h>
+#include "qadataswap_core.h"
 
-auto writer = qadataswap::SharedDataFrame::CreateWriter("mydata", 100 * 1024 * 1024);
-auto table = create_arrow_table();  // 您的Arrow表
-writer->Write(table);
+// 编译后运行示例
+// ./build/cpp/examples/cpp/cpp_writer test_data
+// ./build/cpp/examples/cpp/cpp_reader test_data
 
-auto reader = qadataswap::SharedDataFrame::CreateReader("mydata");
-auto result = reader->Read();
-auto table = result.ValueOrDie();
+// 或查看 examples/cpp/ 中的完整示例
+```
+
+### 运行示例
+
+```bash
+# C++ 示例
+cd build/cpp/examples/cpp
+./basic_example
+./performance_test
+
+# Python 示例
+cd examples/python
+python3 basic_example.py
+python3 polars_integration.py
+
+# Rust 示例
+cd examples/rust
+cargo run --bin basic_example writer
+cargo run --bin rust_writer demo_name
+
+# 跨语言集成测试
+python3 tests/integration/test_cross_language.py
+
+# 性能基准测试
+python3 tests/performance/benchmark_all.py
 ```
 
 ## 📊 性能特点
@@ -135,59 +186,134 @@ auto table = result.ValueOrDie();
 - **内存效率**: 零额外拷贝，直接指针访问
 - **并发**: 支持多读者单写者模式
 
-## 🧪 高级特性
+## 🏗️ 项目结构
 
-### 流式传输
+```
+qadataswap/
+├── src/
+│   ├── cpp/              # C++ 核心实现
+│   │   ├── include/       # 头文件
+│   │   └── src/           # 源文件 + FFI接口
+│   ├── python/            # Python绑定 (pybind11)
+│   └── rust/              # Rust实现 + FFI调用
+├── examples/
+│   ├── cpp/               # C++ 示例
+│   ├── python/            # Python 示例
+│   └── rust/              # Rust 示例
+├── tests/
+│   ├── integration/       # 跨语言集成测试
+│   └── performance/       # 性能基准测试
+├── scripts/
+│   ├── build_all.sh       # 统一构建脚本
+│   └── test_all.sh        # 统一测试脚本
+└── build/                 # 构建输出目录
+```
+
+## 🔧 核心API
+
+### Writer API
+
 ```python
-# 流式写入大数据集
-with SharedDataStream.create_writer("bigdata") as writer:
-    for chunk in large_dataset.iter_chunks(chunk_size=1000000):
-        writer.write_chunk(chunk)
+# Python
+writer = qadataswap.create_writer(name, buffer_count)
+writer.write_arrow(arrow_table)
 
-# 流式读取
-reader = SharedDataStream.create_reader("bigdata")
-for chunk in reader.iter_chunks():
-    process(chunk)
+# Rust
+let writer = create_writer(name, buffer_count);
+writer.write_arrow(&arrow_table);
+
+# C++ (通过FFI)
+qads_create_writer(arena, name);
 ```
 
-### 条件同步
+### Reader API
+
 ```python
-# 等待特定条件
-reader.wait_for_condition(lambda df: len(df) > 1000)
+# Python
+reader = qadataswap.create_reader(name)
+arrow_table = reader.read_arrow(timeout_ms)
 
-# 或者使用异步API
-import asyncio
-df = await reader.read_async()
+# Rust
+let reader = create_reader(name);
+let arrow_table = reader.read_arrow(timeout_ms);
+
+# C++ (通过FFI)
+qads_attach_reader(arena, name);
 ```
 
-## 🔧 配置选项
+## 📈 性能测试
 
-```yaml
-# qadataswap.yaml
-memory:
-  size_mb: 1024
-  num_buffers: 3
+运行性能基准测试：
 
-sync:
-  timeout_ms: 5000
-  retry_count: 3
+```bash
+# 完整性能测试
+./scripts/test_all.sh --with-performance
 
-compression:
-  enabled: true
-  algorithm: "lz4"
+# 或直接运行
+python3 tests/performance/benchmark_all.py
 ```
 
-## 📈 基准测试结果
+### 测试覆盖
 
-| 操作 | 传统方法 | QADataSwap | 提升倍数 |
-|------|----------|------------|----------|
-| 1M行读取 | 50ms | 0.5ms | 100x |
-| 数据拷贝 | 200MB/s | 10GB/s | 50x |
-| 内存使用 | 2x | 1x | 50% |
+- **C++ 组件测试**: 基础示例、性能测试
+- **Python 组件测试**: Polars集成、Arrow转换、内存使用
+- **Rust 组件测试**: 单元测试、示例运行、性能基准
+- **跨语言测试**: Python↔C++, Python↔Rust, C++↔Rust
+- **内存分析**: 峰值使用量、泄漏检测
+
+### 实际性能特点
+
+- **低延迟**: 微秒级数据访问
+- **高吞吐**: 受内存带宽限制
+- **零拷贝**: 直接共享内存访问
+- **跨语言**: 无序列化开销
+
+## 🐛 故障排除
+
+### 构建问题
+
+```bash
+# 检查依赖
+./scripts/build_all.sh --help
+
+# 清理重建
+./scripts/build_all.sh --clean
+
+# 检查库链接
+nm -D build/cpp/libqadataswap_core.so | grep qads
+```
+
+### 运行时问题
+
+```bash
+# 清理共享内存
+find /dev/shm -name "qads_*" -delete
+
+# 检查权限
+ls -la /dev/shm/
+
+# 查看详细错误
+export RUST_BACKTRACE=1
+```
+
+### 测试失败
+
+```bash
+# 逐个测试
+./scripts/test_all.sh --cpp-only
+./scripts/test_all.sh --python-only
+./scripts/test_all.sh --rust-only
+
+# 查看详细日志
+./scripts/test_all.sh --no-report
+```
 
 ## 🤝 贡献
 
-欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情。
+1. Fork 本项目
+2. 创建特性分支
+3. 运行完整测试：`./scripts/test_all.sh`
+4. 提交 Pull Request
 
 ## 📄 许可证
 
