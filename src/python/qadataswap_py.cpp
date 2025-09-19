@@ -80,13 +80,13 @@ public:
 
         // Convert to PyArrow Table
         auto py_table = wrap_table(table.ValueOrDie());
-        if (!py_table.ok()) {
+        if (!py_table) {
             throw std::runtime_error("Failed to wrap table");
         }
 
         // Convert PyArrow Table to Polars DataFrame
         py::module polars = py::module::import("polars");
-        py::object polars_df = polars.attr("from_arrow")(py::reinterpret_steal<py::object>(py_table.ValueOrDie()));
+        py::object polars_df = polars.attr("from_arrow")(py::reinterpret_steal<py::object>(py_table));
 
         return polars_df;
     }
@@ -101,11 +101,11 @@ public:
         }
 
         auto py_table = wrap_table(result.ValueOrDie());
-        if (!py_table.ok()) {
+        if (!py_table) {
             throw std::runtime_error("Failed to wrap table");
         }
 
-        return py::reinterpret_steal<py::object>(py_table.ValueOrDie());
+        return py::reinterpret_steal<py::object>(py_table);
     }
 
     bool wait_for_data(int timeout_ms = -1) {
@@ -160,7 +160,7 @@ private:
         return arrow::py::unwrap_table(obj);
     }
 
-    arrow::Result<PyObject*> wrap_table(const std::shared_ptr<arrow::Table>& table) {
+    PyObject* wrap_table(const std::shared_ptr<arrow::Table>& table) {
         return arrow::py::wrap_table(table);
     }
 };
@@ -170,7 +170,6 @@ private:
 } // namespace qadataswap
 
 PYBIND11_MODULE(qadataswap, m) {
-    // Initialize PyArrow
     arrow::py::import_pyarrow();
 
     m.doc() = "QADataSwap: High-performance cross-language zero-copy data transfer with Polars support";

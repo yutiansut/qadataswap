@@ -7,9 +7,51 @@ import sys
 import os
 import time
 import multiprocessing as mp
+import glob
+import atexit
 
 # 添加包路径
 sys.path.insert(0, '/home/quantaxis/qadataswap/src/python')
+
+def cleanup_shared_memory(name=None):
+    """清理共享内存文件"""
+    try:
+        if name:
+            # 清理特定名称的共享内存
+            shm_files = [
+                f"/dev/shm/qads_{name}",
+                f"/dev/shm/sem.qads_r_{name}",
+                f"/dev/shm/sem.qads_w_{name}"
+            ]
+        else:
+            # 只清理这个脚本创建的特定共享内存
+            test_names = ["test_basic", "test_multiprocess", "perf_test"]
+            shm_files = []
+            for test_name in test_names:
+                shm_files.extend([
+                    f"/dev/shm/qads_{test_name}",
+                    f"/dev/shm/sem.qads_r_{test_name}",
+                    f"/dev/shm/sem.qads_w_{test_name}"
+                ])
+        
+        cleaned_count = 0
+        for file_path in shm_files:
+            try:
+                if os.path.exists(file_path):
+                    os.unlink(file_path)
+                    print(f"已清理: {file_path}")
+                    cleaned_count += 1
+            except Exception as e:
+                print(f"清理 {file_path} 时出错: {e}")
+        
+        if cleaned_count == 0 and not name:
+            print("没有发现需要清理的共享内存文件")
+                
+    except Exception as e:
+        print(f"清理共享内存时出错: {e}")
+
+# 程序退出时自动清理
+atexit.register(cleanup_shared_memory)
 
 def test_import():
     """测试导入功能"""
@@ -31,6 +73,9 @@ def test_import():
 def test_basic_functionality():
     """测试基本功能"""
     print("\n--- Testing Basic Functionality ---")
+    
+    # 清理可能存在的共享内存文件
+    cleanup_shared_memory("test_basic")
 
     try:
         import qadataswap
@@ -88,9 +133,21 @@ def test_basic_functionality():
         print(f"✓ Writer stats: {writer_stats}")
         print(f"✓ Reader stats: {reader_stats}")
 
-        # 清理
-        writer.close()
-        reader.close()
+        # 清理资源
+        try:
+            writer.close()
+            print("✓ Writer closed")
+        except Exception as e:
+            print(f"Warning: Writer close error: {e}")
+        
+        try:
+            reader.close() 
+            print("✓ Reader closed")
+        except Exception as e:
+            print(f"Warning: Reader close error: {e}")
+            
+        # 手动清理共享内存
+        cleanup_shared_memory("test_basic")
         print("✓ Resources cleaned up")
 
         return True
@@ -188,9 +245,12 @@ def reader_process(shared_name, num_iterations=3):
 def test_multiprocess():
     """测试多进程通信"""
     print("\n--- Testing Multiprocess Communication ---")
-
+    
     shared_name = "test_multiprocess"
     num_iterations = 3
+    
+    # 清理可能存在的共享内存文件
+    cleanup_shared_memory(shared_name)
 
     # 创建进程
     writer_proc = mp.Process(target=writer_process, args=(shared_name, num_iterations))
@@ -222,6 +282,9 @@ def test_multiprocess():
 def test_performance():
     """性能测试"""
     print("\n--- Performance Test ---")
+    
+    # 清理可能存在的共享内存文件
+    cleanup_shared_memory("perf_test")
 
     try:
         import qadataswap
@@ -264,9 +327,19 @@ def test_performance():
         else:
             print("✗ Performance test failed - no data read")
 
-        # 清理
-        writer.close()
-        reader.close()
+        # 清理资源
+        try:
+            writer.close()
+        except Exception as e:
+            print(f"Warning: Performance test writer close error: {e}")
+        
+        try:
+            reader.close()
+        except Exception as e:
+            print(f"Warning: Performance test reader close error: {e}")
+            
+        # 手动清理共享内存
+        cleanup_shared_memory("perf_test")
 
     except Exception as e:
         print(f"✗ Performance test failed: {e}")
@@ -277,6 +350,10 @@ def main():
     """主测试函数"""
     print("QADataSwap Complete Version Test")
     print("=" * 60)
+    
+    # 程序开始时清理所有测试相关的共享内存
+    print("清理旧的共享内存文件...")
+    cleanup_shared_memory()
 
     # 测试导入
     if not test_import():
@@ -298,6 +375,18 @@ def main():
 
     print("\n" + "=" * 60)
     print("All tests completed!")
+    
+    # 程序结束前最后清理
+    print("程序结束前清理...")
+    cleanup_shared_memory()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n程序被中断，清理中...")
+        cleanup_shared_memory()
+    except Exception as e:
+        print(f"程序异常退出: {e}")
+        cleanup_shared_memory()
+        raise
