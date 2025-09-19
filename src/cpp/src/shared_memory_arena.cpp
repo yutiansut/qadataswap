@@ -382,15 +382,24 @@ std::unique_ptr<SharedMemoryArena::Reader> SharedMemoryArena::GetReader() {
 }
 
 void SharedMemoryArena::Close() {
-    if (mapped_memory_) {
+    // 保存需要的信息，在解除内存映射前
+    std::string write_sem_name;
+    std::string read_sem_name;
+    
+    if (mapped_memory_ && header_) {
         if (is_writer_) {
             header_->writer_active.store(false);
+            // 保存信号量名称
+            write_sem_name = std::string(header_->write_sem_name);
+            read_sem_name = std::string(header_->read_sem_name);
         } else {
             header_->reader_count.fetch_sub(1);
         }
 
+        // 解除内存映射
         munmap(mapped_memory_, total_size_);
         mapped_memory_ = nullptr;
+        header_ = nullptr;  // 标记指针无效
     }
 
     if (shm_fd_ != -1) {
@@ -400,16 +409,18 @@ void SharedMemoryArena::Close() {
 
     if (write_sem_ && write_sem_ != SEM_FAILED) {
         sem_close(write_sem_);
-        if (is_writer_) {
-            sem_unlink(header_->write_sem_name);
+        if (is_writer_ && !write_sem_name.empty()) {
+            sem_unlink(write_sem_name.c_str());
         }
+        write_sem_ = nullptr;
     }
 
     if (read_sem_ && read_sem_ != SEM_FAILED) {
         sem_close(read_sem_);
-        if (is_writer_) {
-            sem_unlink(header_->read_sem_name);
+        if (is_writer_ && !read_sem_name.empty()) {
+            sem_unlink(read_sem_name.c_str());
         }
+        read_sem_ = nullptr;
     }
 
     if (is_writer_) {

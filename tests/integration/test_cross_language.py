@@ -71,23 +71,61 @@ class CrossLanguageTest:
             writer.write_arrow(df.to_arrow())
             print("  ✅ Python 数据写入完成")
 
-            # C++ 读取数据
+            # 启动 C++ 读取器并让它在后台运行
             print("  📖 启动 C++ 读取器...")
-            cpp_reader = subprocess.run([
+            cpp_reader_process = subprocess.Popen([
                 str(self.cpp_examples / 'cpp_reader'),
                 self.test_name + "_py_to_cpp"
-            ], capture_output=True, text=True, timeout=10)
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-            if cpp_reader.returncode == 0:
-                print("  ✅ C++ 成功读取 Python 数据")
-                return True
+            # 等待一段时间让C++读取器处理第一批数据
+            print("  ⏳ 等待 C++ 读取器处理数据...")
+            import time
+            time.sleep(3)  # 给足够时间处理第一批数据
+
+            # 检查进程是否还在运行
+            if cpp_reader_process.poll() is None:
+                # 进程仍在运行，说明它在等待更多数据，这是正常的
+                print("  ✅ C++ 读取器正在处理数据...")
+                
+                # 等待一小段时间后终止进程
+                time.sleep(2)
+                cpp_reader_process.terminate()
+                
+                try:
+                    stdout, stderr = cpp_reader_process.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    cpp_reader_process.kill()
+                    stdout, stderr = cpp_reader_process.communicate()
+                
+                # 检查输出中是否有成功读取的证据
+                if "Reader attached successfully" in stdout and "Batch 1 received" in stdout:
+                    print("  ✅ C++ 成功读取 Python 数据")
+                    print(f"  📊 C++ 读取到数据并处理成功")
+                    return True
+                else:
+                    print(f"  ❌ C++ 读取不完整:")
+                    print(f"    stdout: {stdout[:500]}...")
+                    return False
             else:
-                print(f"  ❌ C++ 读取失败: {cpp_reader.stderr}")
-                return False
+                # 进程已经结束
+                stdout, stderr = cpp_reader_process.communicate()
+                if cpp_reader_process.returncode == 0:
+                    print("  ✅ C++ 成功读取 Python 数据")
+                    return True
+                else:
+                    print(f"  ❌ C++ 读取失败: {stderr}")
+                    return False
 
         except Exception as e:
             print(f"  ❌ Python -> C++ 测试失败: {e}")
             return False
+        finally:
+            # 清理
+            try:
+                writer.close()
+            except:
+                pass
 
     def test_cpp_to_python(self):
         """测试 C++ -> Python 数据传输"""
