@@ -11,7 +11,9 @@ keywords = ["polars", "arrow", "shared-memory", "zero-copy", "ipc"]
 categories = ["science", "data-structures", "memory-management"]
 
 [workspace.dependencies]
-polars = { version = "0.41", features = ["lazy", "streaming", "ipc"] }
+# Updated to 0.51 to match qars2 main project
+# Note: 'streaming' feature removed in 0.51, using available features instead
+polars = { path = "../polars/crates/polars", default-features = false, features = ["lazy", "ipc", "parquet", "fmt", "temporal"] }
 
 libc = "0.2"
 memmap2 = "0.7"

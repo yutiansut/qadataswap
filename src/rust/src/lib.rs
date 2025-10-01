@@ -323,7 +323,7 @@ impl SharedDataStream {
     }
 
     /// Iterator over chunks as DataFrames
-    pub fn iter_chunks(&self) -> DataFrameChunkIterator {
+    pub fn iter_chunks(&self) -> DataFrameChunkIterator<'_> {
         DataFrameChunkIterator { stream: self }
     }
 }

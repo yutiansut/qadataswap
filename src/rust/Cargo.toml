@@ -31,7 +31,6 @@ cc = "1.0"
 default = ["polars-support"]
 polars-support = []
 async = ["tokio", "futures"]
-streaming = []
 
 [dev-dependencies]
 criterion = "0.5"
